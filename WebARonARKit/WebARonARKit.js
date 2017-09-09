@@ -3597,6 +3597,16 @@
     }
 
     WebARonARKitVRDisplay.anchors_ = data.anchors;
+    var timestamps = WebARonARKitVRDisplay.anchorTimestamps_;
+    if (timestamps) {
+      var now = Date.now();
+      for (var i = 0; i < WebARonARKitVRDisplay.anchors_.length; i++) {
+        var anchor = WebARonARKitVRDisplay.anchors_[i];
+        var id = anchor.identifier.toString();
+        if (!timestamps[id]) { timestamps[id] = now; }
+        anchor.timestamp = timestamps[id];
+      }
+    }
 
     callRafCallbacks();
   };
@@ -3609,6 +3619,18 @@
   * @constructor
   */
  window.WebARonARKitAnchorEvent = function(data) {
+   if (!WebARonARKitVRDisplay.anchorTimestamps_) { WebARonARKitVRDisplay.anchorTimestamps_ = {}; }
+   var timestamps = WebARonARKitVRDisplay.anchorTimestamps_;
+   var now = Date.now();
+   for (var i = 0; i < data.anchors.length; i++) {
+     var anchor = data.anchors[i];
+     var id = anchor.identifier.toString();
+     if (data.type === 'Removed') {
+       delete timestamps[id];
+     } else {
+       timestamps[id] = now;
+     }
+   }
    WebARonARKitVRDisplay.dispatchEvent(new CustomEvent('anchors' + data.type, { detail: data }));
  };
  
