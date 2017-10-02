@@ -985,6 +985,33 @@ didRemoveAnchors:(nonnull NSArray<ARAnchor *> *)anchors {
     position[1] = pModelMatrix[13];
     position[2] = pModelMatrix[14];
 
+    NSString *points = @"\"points\":[";
+    ARPointCloud *rawPoints = frame.rawFeaturePoints;
+    if (rawPoints != NULL) {
+        for (unsigned i=0; i<rawPoints.count; i++) {
+            NSString *pointStr = [NSString stringWithFormat:
+                                   @"%f,%f,%f",
+                                   rawPoints.points[i].x,
+                                   rawPoints.points[i].y,
+                                   rawPoints.points[i].z];
+            if (i < rawPoints.count - 1) {
+                pointStr = [pointStr stringByAppendingString:@","];
+            }
+            points = [points stringByAppendingString:pointStr];
+        }
+    }
+    points = [points stringByAppendingString:@"]"];
+    
+    NSString *lightestimate = @"\"lightEstimate\":{\"ambientIntensity\":";
+    ARLightEstimate *rawEstimate = frame.lightEstimate;
+    if (rawEstimate != NULL) {
+        lightestimate = [lightestimate stringByAppendingString:
+            [NSString stringWithFormat:@"%f", rawEstimate.ambientIntensity]];
+    } else {
+        lightestimate = [lightestimate stringByAppendingString:@"undefined"];
+    }
+    lightestimate = [lightestimate stringByAppendingString:@"}"];
+
     // Get the camera frame in base 64.
     NSString* base64ImageString = @"";
     if (SEND_CAMERA_FRAME_TO_JS) {
@@ -1040,7 +1067,12 @@ didRemoveAnchors:(nonnull NSArray<ARAnchor *> *)anchors {
         options:NSJSONWritingPrettyPrinted error:&error];
     NSString* jsonString = [[NSString alloc] initWithData:jsonData
         encoding:NSUTF8StringEncoding];
-  
+
+    // Append points and light estimate
+    jsonString = [NSString stringWithFormat:@"%@,%@,%@}"
+      points,
+      lightestimate, 
+      [jsonString substringFromIndex: 1]];  
 //    NSLog(@"jsonString = %@", jsonString);
 
     // This will be the final JS code to evaluate
