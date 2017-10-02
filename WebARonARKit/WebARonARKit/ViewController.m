@@ -651,6 +651,33 @@
     //  NSLog(@"width = %d, height = %d, bytesPerRow = %d, ostype = %d", width,
     //  height, bytesPerRow, pixelFormatType);
     
+    NSString *points = @"\"points\":[";
+    ARPointCloud *rawPoints = frame.rawFeaturePoints;
+    if (rawPoints != NULL) {
+        for (unsigned i=0; i<rawPoints.count; i++) {
+            NSString *pointStr = [NSString stringWithFormat:
+                                   @"%f,%f,%f",
+                                   rawPoints.points[i].x,
+                                   rawPoints.points[i].y,
+                                   rawPoints.points[i].z];
+            if (i < rawPoints.count - 1) {
+                pointStr = [pointStr stringByAppendingString:@","];
+            }
+            points = [points stringByAppendingString:pointStr];
+        }
+    }
+    points = [points stringByAppendingString:@"]"];
+    
+    NSString *lightestimate = @"\"lightEstimate\":{\"ambientIntensity\":";
+    ARLightEstimate *rawEstimate = frame.lightEstimate;
+    if (rawEstimate != NULL) {
+        lightestimate = [lightestimate stringByAppendingString:
+            [NSString stringWithFormat:@"%f", rawEstimate.ambientIntensity]];
+    } else {
+        lightestimate = [lightestimate stringByAppendingString:@"undefined"];
+    }
+    lightestimate = [lightestimate stringByAppendingString:@"}"];
+
     NSString *jsCode = [NSString
         stringWithFormat:@"if (window.WebARonARKitSetData) "
                          @"window.WebARonARKitSetData({"
@@ -659,7 +686,9 @@
                          @"\"viewMatrix\":[%f,%f,%f,%f,%f,%f,%f,%"
                          @"f,%f,%f,%f,%f,%f,%f,%f,%f],"
                          @"\"projectionMatrix\":[%f,%f,%f,%f,%f,%f,%f,%"
-                         @"f,%f,%f,%f,%f,%f,%f,%f,%f]"
+                         @"f,%f,%f,%f,%f,%f,%f,%f,%f],"
+                         @"%@,"
+                         @"%@"
                          @"});",
                          position[0], position[1], position[2],
                          pOrientationQuat[0], pOrientationQuat[1],
@@ -676,7 +705,9 @@
                          pProjectionMatrix[8], pProjectionMatrix[9],
                          pProjectionMatrix[10], pProjectionMatrix[11],
                          pProjectionMatrix[12], pProjectionMatrix[13],
-                         pProjectionMatrix[14], pProjectionMatrix[15]];
+                         pProjectionMatrix[14], pProjectionMatrix[15],
+                         points,
+                         lightestimate];
 
     [self->wkWebView
         evaluateJavaScript:jsCode
