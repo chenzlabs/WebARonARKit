@@ -711,6 +711,16 @@
       return !event.defaultPrevented;
     };
 
+    this.getPointCloud = function() {
+      return this.points_
+        ? {timestamp: this.timestamp_, position:[0,0,0], orientation:[0,0,0,1], points: this.points_}
+        : undefined;
+    };
+ 
+    this.getAmbientLightIntensity = function() {
+      return this.lightEstimate_ ? this.lightEstimate_.ambientIntensity : undefined;
+    };
+ 
     return this;
   };
 
@@ -1018,6 +1028,9 @@
     for (var i = 0; i < 16; i++) {
       WebARonARKitVRDisplay.projectionMatrix_[i] = data.projectionMatrix[i];
     }
+
+    WebARonARKitVRDisplay.points_ = data.points;
+    WebARonARKitVRDisplay.lightEstimate_ = data.lightEstimate;
 
     // Only on iOS!
     if (!window.ARCore) {
