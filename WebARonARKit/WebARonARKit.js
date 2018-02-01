@@ -1095,7 +1095,6 @@
             newAnchor.name = eventAnchor.name;
             newAnchor.physicalSize = eventAnchor.physicalSize;
             WebARonARKitVRDisplay.anchors_.set(eventAnchor.identifier, newAnchor);
-            updatedAnchors.push(newAnchor);
           }
           var anchor = WebARonARKitVRDisplay.anchors_.get(
               eventAnchor.identifier);
