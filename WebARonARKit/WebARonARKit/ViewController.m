@@ -710,6 +710,8 @@ const float CAMERA_FRAME_JPEG_COMPRESSION_FACTOR = 0.5;
     ARWorldTrackingConfiguration *configuration =
     [ARWorldTrackingConfiguration new];
     configuration.planeDetection = ARPlaneDetectionHorizontal;
+    // Add detection of reference images.
+    configuration.detectionImages = [ARReferenceImage referenceImagesInGroupNamed:@"AR Resources" bundle:nil];
     [_session runWithConfiguration:configuration
                            options:ARSessionRunOptionResetTracking];
 }
@@ -871,16 +873,34 @@ const float CAMERA_FRAME_JPEG_COMPRESSION_FACTOR = 0.5;
         const float *anchorMatrix = (const float *)(&anchorTransform);
         NSString *jsAnchorId =
         objCAnchorIdsToJSAnchorIds[anchor.identifier.UUIDString];
+        NSString *additionalStr = @"";
+        // If image anchor, also convey name and physicalSize, and use native identifier.
+        if ([anchor isKindOfClass:[ARImageAnchor class]]) {
+            ARImageAnchor *imageAnchor = (ARImageAnchor*)anchor;
+            additionalStr = [NSString
+                             stringWithFormat:
+                             @"\"name\":\"%@\","
+                             @"\"physicalSize\":[%f,%f],",
+                             imageAnchor.referenceImage.name, // FIXME: transform to JS
+                             imageAnchor.referenceImage.physicalSize.width,
+                             imageAnchor.referenceImage.physicalSize.height
+                             ];
+            jsAnchorId = [NSString
+                          stringWithFormat:
+                          @"\"%@\"",
+                          anchor.identifier.UUIDString];
+        }
         NSString *anchorStr = [NSString
                                stringWithFormat:
                                @"{\"modelMatrix\":[%f,%f,%f,%f,%f,%f,%f,%f,"
                                @"%f,%f,%f,%f,%f,%f,%f,%f],"
+                               @"%@"
                                @"\"identifier\":%@}",
                                anchorMatrix[0], anchorMatrix[1], anchorMatrix[2], anchorMatrix[3],
                                anchorMatrix[4], anchorMatrix[5], anchorMatrix[6], anchorMatrix[7],
                                anchorMatrix[8], anchorMatrix[9], anchorMatrix[10],
                                anchorMatrix[11], anchorMatrix[12], anchorMatrix[13],
-                               anchorMatrix[14], anchorMatrix[15], jsAnchorId];
+                               anchorMatrix[14], anchorMatrix[15], additionalStr, jsAnchorId];
         anchorStr = [anchorStr stringByAppendingString:@","];
         result = [result stringByAppendingString:anchorStr];
     }
