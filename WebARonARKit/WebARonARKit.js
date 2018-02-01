@@ -1089,15 +1089,19 @@
         var updatedAnchors = [];
         for (var j = 0; j < event.anchors.length; j++) {
           var eventAnchor = event.anchors[j];
-          // If the anchor has a name, it's a detected image that only updates once, so add it.
-          if (eventAnchor.name) {
-            var newAnchor = new VRAnchor(eventAnchor.modelMatrix);
-            newAnchor.name = eventAnchor.name;
-            newAnchor.physicalSize = eventAnchor.physicalSize;
-            WebARonARKitVRDisplay.anchors_.set(eventAnchor.identifier, newAnchor);
-          }
           var anchor = WebARonARKitVRDisplay.anchors_.get(
               eventAnchor.identifier);
+          // If we don't know this anchor...
+          if (!anchor) {
+            // If the anchor has a name, it's a detected image, so add it.
+            if (eventAnchor.name) {
+              var newAnchor = new VRAnchor(eventAnchor.modelMatrix);
+              newAnchor.name = eventAnchor.name;
+              newAnchor.physicalSize = eventAnchor.physicalSize;
+              WebARonARKitVRDisplay.anchors_.set(eventAnchor.identifier, newAnchor);
+              anchor = newAnchor;
+            }
+          }
           // As the bridge is asynchronous, it could happen that an anchor is
           // updated but it has already been removed.
           if (anchor) {
