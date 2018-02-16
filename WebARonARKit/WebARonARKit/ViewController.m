@@ -710,8 +710,10 @@ const float CAMERA_FRAME_JPEG_COMPRESSION_FACTOR = 0.5;
     ARWorldTrackingConfiguration *configuration =
     [ARWorldTrackingConfiguration new];
     configuration.planeDetection = ARPlaneDetectionHorizontal;
-    // Add detection of reference images.
-    configuration.detectionImages = [ARReferenceImage referenceImagesInGroupNamed:@"AR Resources" bundle:nil];
+    if (@available(iOS 11.3, *)) {
+      // Add detection of reference images.
+      configuration.detectionImages = [ARReferenceImage referenceImagesInGroupNamed:@"AR Resources" bundle:nil];
+    }
     [_session runWithConfiguration:configuration
                            options:ARSessionRunOptionResetTracking];
 }
@@ -874,21 +876,23 @@ const float CAMERA_FRAME_JPEG_COMPRESSION_FACTOR = 0.5;
         NSString *jsAnchorId =
         objCAnchorIdsToJSAnchorIds[anchor.identifier.UUIDString];
         NSString *additionalStr = @"";
-        // If image anchor, also convey name and physicalSize, and use native identifier.
-        if ([anchor isKindOfClass:[ARImageAnchor class]]) {
-            ARImageAnchor *imageAnchor = (ARImageAnchor*)anchor;
-            additionalStr = [NSString
-                             stringWithFormat:
-                             @"\"name\":\"%@\","
-                             @"\"physicalSize\":[%f,%f],",
-                             imageAnchor.referenceImage.name, // FIXME: transform to JS
-                             imageAnchor.referenceImage.physicalSize.width,
-                             imageAnchor.referenceImage.physicalSize.height
-                             ];
-            jsAnchorId = [NSString
-                          stringWithFormat:
-                          @"\"%@\"",
-                          anchor.identifier.UUIDString];
+        if (@available(iOS 11.3, *)) {
+            // If image anchor, also convey name and physicalSize, and use native identifier.
+            if ([anchor isKindOfClass:[ARImageAnchor class]]) {
+                ARImageAnchor *imageAnchor = (ARImageAnchor*)anchor;
+                additionalStr = [NSString
+                                 stringWithFormat:
+                                 @"\"name\":\"%@\","
+                                 @"\"physicalSize\":[%f,%f],",
+                                 imageAnchor.referenceImage.name, // FIXME: transform to JS
+                                 imageAnchor.referenceImage.physicalSize.width,
+                                 imageAnchor.referenceImage.physicalSize.height
+                                 ];
+                jsAnchorId = [NSString
+                              stringWithFormat:
+                              @"\"%@\"",
+                              anchor.identifier.UUIDString];
+            }
         }
         NSString *anchorStr = [NSString
                                stringWithFormat:
@@ -1101,7 +1105,7 @@ didRemoveAnchors:(nonnull NSArray<ARAnchor *> *)anchors {
         encoding:NSUTF8StringEncoding];
 
     // Append points and light estimate
-    jsonString = [NSString stringWithFormat:@"%@,%@,%@}"
+    jsonString = [NSString stringWithFormat:@"{%@,%@,%@",
       points,
       lightestimate, 
       [jsonString substringFromIndex: 1]];  
@@ -1119,9 +1123,11 @@ didRemoveAnchors:(nonnull NSArray<ARAnchor *> *)anchors {
      evaluateJavaScript:jsCode
      completionHandler:^(id data, NSError *error) {
        if (error) {
+/* if debugging Javascript, this fires per frame and prevents that from working properly
          [self showAlertDialog:
              [NSString stringWithFormat:@"ERROR: Evaluating jscode: %@", error]
              completionHandler:^{ }];
+*/
          }
      }];
 
