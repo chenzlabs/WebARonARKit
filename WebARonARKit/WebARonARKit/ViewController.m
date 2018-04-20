@@ -390,7 +390,8 @@ const float CAMERA_FRAME_JPEG_COMPRESSION_FACTOR = 0.5;
 
     // Load the default website.
     NSString *defaultSite =
-        @"https://developers.google.com/ar/develop/web/getting-started#examples";
+        @"http://thundering-organization.glitch.me/";
+        // @"https://developers.google.com/ar/develop/web/getting-started#examples";
     NSURL *url = [NSURL URLWithString:defaultSite];
     [wkWebView loadRequest:[NSURLRequest requestWithURL:url]];
     [urlTextField setText:url.absoluteString];
