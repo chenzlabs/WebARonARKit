@@ -96,6 +96,14 @@
     callNativeFunction('removeAnchor', identifier);
   }
 
+  function nativeAddImage(name, imageurl, physicalWidth) {
+    callNativeFunction('addImage', name, imageurl, physicalWidth);
+  }
+
+  function nativeRemoveImage(name) {
+    callNativeFunction('removeImage', name);
+  }
+
   function nativeGetFrame() {
     return callNativeFunction('getFrame');
   }
@@ -675,6 +683,14 @@
       nativeRemoveAnchor(anchor.identifier);
       this.anchors_.delete(anchor.identifier);
       this.dispatchEvent({type:"anchorsremoved", anchors:[anchor]});
+    };
+
+    this.addImage = function(name, imageurl, physicalWidth) {
+      nativeAddImage(name, imageurl, physicalWidth);
+    };
+
+    this.removeImage = function(name) {
+      nativeRemoveImage(name);
     };
 
     /**
