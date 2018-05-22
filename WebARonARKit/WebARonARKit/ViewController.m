@@ -1357,13 +1357,61 @@ cameraDidChangeTrackingState:(ARCamera *)camera {
 
 #pragma mark - WKScriptMessageHandler
 
+CGImageRef MyCreateCGImageFromURLString (NSString* path)
+{
+    // Get the URL for the pathname passed to the function.
+    NSURL *url = [NSURL URLWithString:path];
+    CGImageRef        myImage = NULL;
+    CGImageSourceRef  myImageSource;
+    CFDictionaryRef   myOptions = NULL;
+    CFStringRef       myKeys[2];
+    CFTypeRef         myValues[2];
+    
+    // Set up options if you want them. The options here are for
+    // caching the image in a decoded form and for using floating-point
+    // values if the image format supports them.
+    myKeys[0] = kCGImageSourceShouldCache;
+    myValues[0] = (CFTypeRef)kCFBooleanTrue;
+    myKeys[1] = kCGImageSourceShouldAllowFloat;
+    myValues[1] = (CFTypeRef)kCFBooleanTrue;
+    // Create the dictionary
+    myOptions = CFDictionaryCreate(NULL, (const void **) myKeys,
+                                   (const void **) myValues, 2,
+                                   &kCFTypeDictionaryKeyCallBacks,
+                                   & kCFTypeDictionaryValueCallBacks);
+    // Create an image source from the URL.
+    myImageSource = CGImageSourceCreateWithURL((CFURLRef)url, myOptions);
+    CFRelease(myOptions);
+    // Make sure the image source exists before continuing
+    if (myImageSource == NULL){
+        fprintf(stderr, "Image source is NULL.");
+        return  NULL;
+    }
+    // Create an image from the first item in the image source.
+    myImage = CGImageSourceCreateImageAtIndex(myImageSource,
+                                              0,
+                                              NULL);
+    
+    CFRelease(myImageSource);
+    // Make sure the image exists before continuing
+    if (myImage == NULL){
+        fprintf(stderr, "Image not created from image source.");
+        return NULL;
+    }
+    
+    return myImage;
+}
+
+
 - (void)userContentController:(WKUserContentController *)userContentController
       didReceiveScriptMessage:(WKScriptMessage *)message {
     NSString *messageString = message.body;
-    NSArray *values = [messageString componentsSeparatedByString:@":"];
-    if ([values count] > 1) {
-        NSString *method = values[0];
-        NSArray *params = [values[1] componentsSeparatedByString:@","];
+    // NO! Doesn't handle colons in arguments!
+    //NSArray *values = [messageString componentsSeparatedByString:@":"];
+    NSRange range = [messageString rangeOfString:@":"];
+    if (range.location != NSNotFound) { // if ([values count] > 1) {
+        NSString *method = [messageString substringToIndex:range.location]; //values[0];
+        NSArray *params = [[messageString substringFromIndex:range.location+1] /*values[1]*/ componentsSeparatedByString:@","];
         if ([method isEqualToString:@"setDepthNear"]) {
             near = [params[0] floatValue];
         } else if ([method isEqualToString:@"setDepthFar"]) {
@@ -1413,6 +1461,33 @@ cameraDidChangeTrackingState:(ARCamera *)camera {
             // The JS side stated that the AR data was used so we can render
             // a new camera frame now.
             drawNextCameraFrame = true;
+        } else if ([method isEqualToString:@"addImage"]) {
+            // Construct the ARReferenceImage provided from the js side.
+            // - name
+            // - image (URL)
+            // - physicalWidth
+            NSString *imageName = params[0];
+            NSString *image = params[1];
+            CGFloat physicalWidth = [params[2] floatValue];
+            // Add the image to the set.
+            ARWorldTrackingConfiguration *config = (ARWorldTrackingConfiguration *)_session.configuration;
+            ARReferenceImage* newImage = [[ARReferenceImage alloc]
+                initWithCGImage: MyCreateCGImageFromURLString(image)
+                orientation: kCGImagePropertyOrientationUp
+                physicalWidth: physicalWidth];
+            newImage.name = imageName;
+            
+            config.detectionImages = [config.detectionImages setByAddingObject: newImage];
+            [_session runWithConfiguration:config];
+        } else if ([method isEqualToString:@"removeImage"]) {
+            // Remove the ARReferenceImage provided from the js side.
+            // - name
+            NSString *imageName = params[0];
+            // Remove the image from the set.
+            ARWorldTrackingConfiguration *config = (ARWorldTrackingConfiguration *)_session.configuration;
+            NSPredicate* predicate = [NSPredicate predicateWithFormat:@"name != %@", imageName];
+            config.detectionImages = [config.detectionImages filteredSetUsingPredicate:predicate];
+            [_session runWithConfiguration:config];
         } else {
             NSLog(@"WARNING: Unknown message received: '%@'", method);
         }
