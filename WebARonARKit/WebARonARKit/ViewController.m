@@ -704,11 +704,13 @@ const float CAMERA_FRAME_JPEG_COMPRESSION_FACTOR = 0.5;
     [ARWorldTrackingConfiguration new];
     configuration.planeDetection = ARPlaneDetectionHorizontal;
     if (@available(iOS 11.3, *)) {
-      // Add detection of reference images.
-      configuration.detectionImages = [ARReferenceImage referenceImagesInGroupNamed:@"AR Resources" bundle:nil];
+        // Add detection of reference images.
+        configuration.detectionImages = [NSSet<ARReferenceImage*> set];
+            //[ARReferenceImage referenceImagesInGroupNamed:@"AR Resources" bundle:nil];
     }
     [_session runWithConfiguration:configuration
-                           options:ARSessionRunOptionResetTracking];
+                           options:ARSessionRunOptionResetTracking|ARSessionRunOptionRemoveExistingAnchors];
+    NSLog(@"restartSession");
 }
 
 - (void)viewWillAppear:(BOOL)animated {
@@ -720,6 +722,7 @@ const float CAMERA_FRAME_JPEG_COMPRESSION_FACTOR = 0.5;
     }
 
     [self restartSession];
+    NSLog(@"viewWillAppear");
 }
 
 - (void)viewWillDisappear:(BOOL)animated {
@@ -1187,6 +1190,7 @@ completionHandler:(void (^)(void))completionHandler {
 - (void)webView:(WKWebView *)webView
 didStartProvisionalNavigation:(null_unspecified WKNavigation *)navigation {
     [self restartSession];
+    NSLog(@"didStartProvisionalNavigation");
     [self setShowCameraFeed:NO];
     [self startAndShowProgressView];
     [self setProgressViewColorSuccessful];
@@ -1195,7 +1199,8 @@ didStartProvisionalNavigation:(null_unspecified WKNavigation *)navigation {
 
 - (void)webView:(WKWebView *)webView
 didFinishNavigation:(WKNavigation *)navigation {
-    [self restartSession];
+    //[self restartSession];
+    NSLog(@"didFinishNavigation");
     // By default, when a page is loaded, the camera feed should not be shown.
     if (initialPageLoadedWhenTrackingBegins) {
         [self storeURLInUserDefaults:urlTextField.text];
@@ -1223,6 +1228,7 @@ didFailNavigation:(WKNavigation *)navigation
 
 - (void)webViewDidFinishLoad:(UIWebView *)webView {
     [self restartSession];
+    NSLog(@"webViewDidFinishLoad");
     [self completeAndHideProgressViewSuccessful];
 }
 
@@ -1378,30 +1384,38 @@ CGImageRef MyCreateCGImageFromURLString (NSString* path)
     myOptions = CFDictionaryCreate(NULL, (const void **) myKeys,
                                    (const void **) myValues, 2,
                                    &kCFTypeDictionaryKeyCallBacks,
-                                   & kCFTypeDictionaryValueCallBacks);
+                                   &kCFTypeDictionaryValueCallBacks);
     // Create an image source from the URL.
     myImageSource = CGImageSourceCreateWithURL((CFURLRef)url, myOptions);
     CFRelease(myOptions);
     // Make sure the image source exists before continuing
     if (myImageSource == NULL){
-        fprintf(stderr, "Image source is NULL.");
-        return  NULL;
+        NSLog(@"WARNING: Image source is NULL.");
+        return NULL;
     }
     // Create an image from the first item in the image source.
     myImage = CGImageSourceCreateImageAtIndex(myImageSource,
                                               0,
                                               NULL);
-    
+    // Check if we're done loading yet.
+    // FIXME: this seems to return complete even when the image hasn't been loaded yet!
+    CGImageSourceStatus status = CGImageSourceGetStatusAtIndex(myImageSource, 0);
+    if (status == kCGImageStatusIncomplete) {
+        NSLog(@"WARNING: kCGImageStatusIncomplete");
+    } else if (status == kCGImageStatusReadingHeader) {
+        NSLog(@"WARNING: kCGImageStatusReadingHeader");
+    } else if (status != kCGImageStatusComplete) {
+        NSLog(@"WARNING: not kCGImageStatusComplete");
+    }
     CFRelease(myImageSource);
     // Make sure the image exists before continuing
     if (myImage == NULL){
-        fprintf(stderr, "Image not created from image source.");
+        NSLog(@"WARNING: Image not created from image source.");
         return NULL;
     }
     
     return myImage;
 }
-
 
 - (void)userContentController:(WKUserContentController *)userContentController
       didReceiveScriptMessage:(WKScriptMessage *)message {
@@ -1423,6 +1437,7 @@ CGImageRef MyCreateCGImageFromURLString (NSString* path)
             NSLog(@"%@", [message.body substringWithRange:range]);
         } else if ([method isEqualToString:@"resetPose"]) {
             [self restartSession];
+            NSLog(@"resetPose");
         } else if ([method isEqualToString:@"showCameraFeed"]) {
             [self setShowCameraFeed:true];
         } else if ([method isEqualToString:@"hideCameraFeed"]) {
@@ -1462,6 +1477,9 @@ CGImageRef MyCreateCGImageFromURLString (NSString* path)
             // a new camera frame now.
             drawNextCameraFrame = true;
         } else if ([method isEqualToString:@"addImage"]) {
+            // FIXED: this didn't seem to succeed until the page is reloaded
+            // ... because didFinishNavigation would restartSession afterward!
+
             // Construct the ARReferenceImage provided from the js side.
             // - name
             // - image (URL)
@@ -1469,25 +1487,29 @@ CGImageRef MyCreateCGImageFromURLString (NSString* path)
             NSString *imageName = params[0];
             NSString *image = params[1];
             CGFloat physicalWidth = [params[2] floatValue];
+            CGImageRef imageRef = MyCreateCGImageFromURLString(image);
+            ARReferenceImage* newImage = [[ARReferenceImage alloc]
+                                          initWithCGImage: imageRef
+                                          orientation: kCGImagePropertyOrientationUp
+                                          physicalWidth: physicalWidth];
+            newImage.name = imageName;
+
             // Add the image to the set.
             ARWorldTrackingConfiguration *config = (ARWorldTrackingConfiguration *)_session.configuration;
-            ARReferenceImage* newImage = [[ARReferenceImage alloc]
-                initWithCGImage: MyCreateCGImageFromURLString(image)
-                orientation: kCGImagePropertyOrientationUp
-                physicalWidth: physicalWidth];
-            newImage.name = imageName;
-            
             config.detectionImages = [config.detectionImages setByAddingObject: newImage];
             [_session runWithConfiguration:config];
+            NSLog(@"addImage '%@' physicalWidth %f: %@", imageName, physicalWidth, image);
         } else if ([method isEqualToString:@"removeImage"]) {
             // Remove the ARReferenceImage provided from the js side.
             // - name
             NSString *imageName = params[0];
             // Remove the image from the set.
+            // FIXME: are we supposed to CGRelease it?
             ARWorldTrackingConfiguration *config = (ARWorldTrackingConfiguration *)_session.configuration;
             NSPredicate* predicate = [NSPredicate predicateWithFormat:@"name != %@", imageName];
             config.detectionImages = [config.detectionImages filteredSetUsingPredicate:predicate];
             [_session runWithConfiguration:config];
+            NSLog(@"removeImage '%@'", imageName);
         } else {
             NSLog(@"WARNING: Unknown message received: '%@'", method);
         }
